@@ -354,7 +354,7 @@ MigrationBackup/
 .ionide/
 
 test.db
-
+job.db
 https/
 /global.json
 ConsumerApp/wait-for.sh

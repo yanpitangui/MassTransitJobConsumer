@@ -15,7 +15,7 @@ namespace MassTransitJobConsumer.Jobs
             IConsumerConfigurator<ConvertVideoJobConsumer> consumerConfigurator)
         {
             consumerConfigurator.Options<JobOptions<ConvertVideo>>(options =>
-                options.SetRetry(r => r.Interval(3, TimeSpan.FromSeconds(30))).SetJobTimeout(TimeSpan.FromMinutes(10)).SetConcurrentJobLimit(10));
+                options.SetJobTimeout(TimeSpan.FromMinutes(10)).SetConcurrentJobLimit(10));
         }
     }
 }

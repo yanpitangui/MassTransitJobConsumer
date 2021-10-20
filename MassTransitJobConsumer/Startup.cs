@@ -17,6 +17,11 @@ using Newtonsoft.Json.Linq;
 using Serilog;
 using System.Linq;
 using System.Threading.Tasks;
+using MassTransit.EntityFrameworkCoreIntegration;
+using MassTransit.EntityFrameworkCoreIntegration.JobService;
+using MassTransit.JobService.Components.StateMachines;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace MassTransitJobConsumer
 {
@@ -38,12 +43,40 @@ namespace MassTransitJobConsumer
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "MassTransitJobConsumer", Version = "v1" });
             });
+            services.AddDbContextPool<JobServiceSagaDbContext>(opt =>
+            {
+                opt.UseNpgsql(Configuration.GetConnectionString("JobService"));
+            });
 
+            AddMassTransit(services);
+        }
+
+        private static void AddMassTransit(IServiceCollection services)
+        {
             services.AddMassTransit(x =>
             {
                 x.AddConsumer<ConvertVideoJobConsumer>(typeof(ConvertVideoJobConsumerDefinition));
 
                 x.AddConsumer<VideoConvertedConsumer>();
+
+                x.AddSagaRepository<JobSaga>()
+                    .EntityFrameworkRepository(r =>
+                    {
+                        r.ExistingDbContext<JobServiceSagaDbContext>();
+                        r.LockStatementProvider = new PostgresLockStatementProvider();
+                    });
+                x.AddSagaRepository<JobTypeSaga>()
+                    .EntityFrameworkRepository(r =>
+                    {
+                        r.ExistingDbContext<JobServiceSagaDbContext>();
+                        r.LockStatementProvider = new PostgresLockStatementProvider();
+                    });
+                x.AddSagaRepository<JobAttemptSaga>()
+                    .EntityFrameworkRepository(r =>
+                    {
+                        r.ExistingDbContext<JobServiceSagaDbContext>();
+                        r.LockStatementProvider = new PostgresLockStatementProvider();
+                    });
 
                 x.AddRequestClient<ConvertVideo>();
 
@@ -52,23 +85,26 @@ namespace MassTransitJobConsumer
                     cfg.UseDelayedMessageScheduler();
 
                     cfg.UseSerilogEnricher();
-                          var options = new ServiceInstanceOptions()
-                        .SetEndpointNameFormatter(context.GetService<IEndpointNameFormatter>() ?? KebabCaseEndpointNameFormatter.Instance);
+                    var options = new ServiceInstanceOptions()
+                        .SetEndpointNameFormatter(context.GetService<IEndpointNameFormatter>() ??
+                                                  KebabCaseEndpointNameFormatter.Instance);
                     cfg.ServiceInstance(options, instance =>
                     {
                         instance.ConfigureJobServiceEndpoints(js =>
                         {
                             js.SagaPartitionCount = 1;
-                            js.FinalizeCompleted = true;
+                            js.ConfigureSagaRepositories(context);
 
+                            instance.ConfigureEndpoints(context);
                         });
-
-                        instance.ConfigureEndpoints(context);
                     });
-                });
-            });
 
+
+                });
+
+            });
             services.AddMassTransitHostedService();
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

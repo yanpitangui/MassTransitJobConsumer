@@ -20,14 +20,24 @@ namespace MassTransitJobConsumer.Jobs
         {
             _logger.LogInformation($"Received convert order to path: {context.Job.Path}");
             var rng = new Random();
+            try
+            {
+                var variance = TimeSpan.FromMilliseconds(rng.Next(100, 3000));
 
-            var variance = TimeSpan.FromMilliseconds(rng.Next(8399, 28377));
+                await Task.Delay(variance);
+                if (rng.Next(1, 3) == 1) throw new ApplicationException();
 
-            await Task.Delay(variance);
-
-            await context.Publish<VideoConverted>(new { 
-                context.JobId         
+                await context.Publish<VideoConverted>(new
+                {
+                    context.JobId
                 });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while converting video");
+                throw;
+            }
+
         }
     }
 }

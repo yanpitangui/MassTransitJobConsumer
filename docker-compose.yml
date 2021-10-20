@@ -6,6 +6,18 @@ services:
     build:
       context: .
       dockerfile: MassTransitJobConsumer/Dockerfile
+    environment:
+      ConnectionStrings__JobService: "host=postgres;user id=postgres;password=Password12!;database=JobService;"
+    depends_on:
+      - postgres
+  postgres:
+    image: "postgres:9.6"
+    environment:
+      - "POSTGRES_PASSWORD=Password12!"
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   elasticsearch:
     container_name: elasticsearch 
@@ -27,3 +39,4 @@ services:
       - elasticsearch
 volumes:
   elastic_data:
+  postgres_data:

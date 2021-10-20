@@ -1,16 +1,15 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Elasticsearch;
 using Serilog.Sinks.Elasticsearch;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
+using MassTransit.EntityFrameworkCoreIntegration.JobService;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MassTransitJobConsumer
 {
@@ -20,10 +19,14 @@ namespace MassTransitJobConsumer
         {
             Log.Logger = CreateLogger();
             var host = CreateHostBuilder(args).Build();
-
+            using var scope = host.Services.CreateScope();
+            var services = scope.ServiceProvider;
             try
             {
                 Log.Logger.Information("Application starting up...");
+                var dbContext = services.GetRequiredService<JobServiceSagaDbContext>();
+                await dbContext.Database.EnsureDeletedAsync();
+                await dbContext.Database.EnsureCreatedAsync();
                 await host.RunAsync();
             }
             catch(Exception ex)
@@ -41,8 +44,8 @@ namespace MassTransitJobConsumer
         public static IHostBuilder CreateHostBuilder(string[] args)
         {
             return Host.CreateDefaultBuilder(args)
-                .UseSerilog()
-                .ConfigureWebHostDefaults(webBuilder => { webBuilder.UseStartup<Startup>(); });
+                .ConfigureWebHostDefaults(webBuilder => { webBuilder.UseStartup<Startup>(); })
+                .UseSerilog();
         }
 
         public static Serilog.ILogger CreateLogger()
@@ -50,6 +53,10 @@ namespace MassTransitJobConsumer
             var configuration = LoadAppConfiguration();
             var elasticSearchUri = configuration.GetValue("ELASTIC_URI", "http://localhost:9200");
             return new LoggerConfiguration()
+                .MinimumLevel.Information()
+                .MinimumLevel.Override("JobService", Serilog.Events.LogEventLevel.Debug)
+                .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
                 .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
                 .ReadFrom.Configuration(configuration)
                 .Destructure.AsScalar<JObject>()
