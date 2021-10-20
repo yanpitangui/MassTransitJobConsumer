@@ -25,7 +25,6 @@ namespace MassTransitJobConsumer
             {
                 Log.Logger.Information("Application starting up...");
                 var dbContext = services.GetRequiredService<JobServiceSagaDbContext>();
-                await dbContext.Database.EnsureDeletedAsync();
                 await dbContext.Database.EnsureCreatedAsync();
                 await host.RunAsync();
             }
@@ -48,16 +47,12 @@ namespace MassTransitJobConsumer
                 .UseSerilog();
         }
 
-        public static Serilog.ILogger CreateLogger()
+        public static ILogger CreateLogger()
         {
             var configuration = LoadAppConfiguration();
             var elasticSearchUri = configuration.GetValue("ELASTIC_URI", "http://localhost:9200");
             return new LoggerConfiguration()
-                .MinimumLevel.Information()
-                .MinimumLevel.Override("JobService", Serilog.Events.LogEventLevel.Debug)
-                .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
-                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
-                .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+                .MinimumLevel.Override("MassTransitJobConsumer", LogEventLevel.Debug)
                 .ReadFrom.Configuration(configuration)
                 .Destructure.AsScalar<JObject>()
                 .Destructure.AsScalar<JArray>()
